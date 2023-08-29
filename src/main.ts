@@ -38,7 +38,7 @@ async function run(): Promise<void> {
     if (conclusion !== CheckSuiteConclusion.success && failStepIfUnsuccessful) {
       core.setFailed('One or more of the check suites were unsuccessful.')
     }
-  } catch (error) {
+  } catch (error: any) {
     core.setFailed(error.message)
   }
 }

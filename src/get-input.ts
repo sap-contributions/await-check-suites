@@ -1,9 +1,11 @@
 import * as core from '@actions/core'
-import {context, GitHub} from '@actions/github'
+import {context, getOctokit} from '@actions/github'
+import type {GitHub} from '@actions/github/lib/utils'
+
 import {parseBoolean} from './parse-boolean'
 
 interface Inputs {
-  client: GitHub
+  client: InstanceType<typeof GitHub>
   owner: string
   repo: string
   ref: string
@@ -22,7 +24,7 @@ export async function getInput(): Promise<Inputs> {
   )
 
   // Create GitHub client
-  const client = new GitHub(core.getInput('token', {required: true}))
+  const client = getOctokit(core.getInput('token', {required: true}))
 
   // Convert the repository input (`${owner}/${repo}`) into two inputs, owner and repo
   const repository = core.getInput('repository', {required: true})
@@ -45,11 +47,11 @@ export async function getInput(): Promise<Inputs> {
       } as ${typeof process.env.GITHUB_RUN_ID}). Please submit an issue on this action's GitHub repo.`
     )
   }
-  /* eslint-disable @typescript-eslint/camelcase */
+
   let checkSuiteID: number | null = null
   if (owner === context.repo.owner && repo === context.repo.repo) {
     const workflowRunID = parseInt(process.env.GITHUB_RUN_ID)
-    const response = await client.actions.getWorkflowRun({owner, repo, run_id: workflowRunID})
+    const response = await client.rest.actions.getWorkflowRun({owner, repo, run_id: workflowRunID})
     if (response.status !== 200) {
       throw new Error(
         `Failed to get workflow run from ${owner}/${repo} with workflow run ID ${workflowRunID}. ` +
@@ -57,7 +59,6 @@ export async function getInput(): Promise<Inputs> {
       )
     }
     // short-term workaround until @actions/github and @octokit/rest are updated to match actual responses
-    /* eslint-disable @typescript-eslint/no-explicit-any */
     const checkSuiteIDString: string | undefined = ((response.data as any).check_suite_url as string).split('/').pop()
     if (!checkSuiteIDString) {
       throw new Error(
@@ -66,10 +67,9 @@ export async function getInput(): Promise<Inputs> {
         } as ${typeof (response.data as any).check_suite_url}). Please submit an issue on this action's GitHub repo.`
       )
     }
-    /* eslint-enable @typescript-eslint/no-explicit-any */
     checkSuiteID = parseInt(checkSuiteIDString)
   }
-  /* eslint-enable @typescript-eslint/camelcase */
+
   if (checkSuiteID !== null && isNaN(checkSuiteID)) {
     throw new Error(
       `Expected the environment variable $GITHUB_RUN_ID to be a number but it isn't (${checkSuiteID} as ${typeof checkSuiteID}). ` +

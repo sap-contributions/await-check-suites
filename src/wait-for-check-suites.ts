@@ -1,9 +1,8 @@
 import * as core from '@actions/core'
-import {GitHub} from '@actions/github'
-import {Octokit} from '@octokit/rest' // imported for types only
+import type {GitHub} from '@actions/github/lib/utils'
+import type {GetResponseDataTypeFromEndpointMethod} from '@octokit/types'
 
 // Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
-/* eslint-disable @typescript-eslint/camelcase */
 // All possible Check Suite statuses in descending order of priority
 enum CheckSuiteStatus {
   pending = 'pending',
@@ -20,10 +19,9 @@ export enum CheckSuiteConclusion {
   neutral = 'neutral',
   success = 'success'
 }
-/* eslint-enable @typescript-eslint/camelcase */
 
 interface WaitForCheckSuitesOptions {
-  client: GitHub
+  client: InstanceType<typeof GitHub>
   owner: string
   repo: string
   ref: string
@@ -35,7 +33,7 @@ interface WaitForCheckSuitesOptions {
   onlyFirstCheckSuite: boolean
 }
 interface CheckTheCheckSuitesOptions {
-  client: GitHub
+  client: InstanceType<typeof GitHub>
   owner: string
   repo: string
   ref: string
@@ -45,7 +43,7 @@ interface CheckTheCheckSuitesOptions {
   onlyFirstCheckSuite: boolean
 }
 interface GetCheckSuitesOptions {
-  client: GitHub
+  client: InstanceType<typeof GitHub>
   owner: string
   repo: string
   ref: string
@@ -73,7 +71,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
     onlyFirstCheckSuite
   } = options
 
-  return new Promise(async resolve => {
+  return new Promise(async (resolve, reject) => {
     // Check to see if all of the check suites have already completed
     let response = await checkTheCheckSuites({
       client,
@@ -137,7 +135,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
     if (timeoutSeconds) {
       timeoutId = setTimeout(() => {
         clearInterval(intervalId)
-        throw new Error(`Timeout of ${timeoutSeconds} seconds reached.`)
+        reject(new Error(`Timeout of ${timeoutSeconds} seconds reached.`))
       }, timeoutSeconds * 1000)
     }
   })
@@ -170,7 +168,7 @@ async function checkTheCheckSuites(
 
     // Filter for Check Suites that match the app slug
     let checkSuites = appSlugFilter
-      ? checkSuitesAndMeta.check_suites.filter(checkSuite => checkSuite.app.slug === appSlugFilter)
+      ? checkSuitesAndMeta.check_suites.filter(checkSuite => checkSuite?.app?.slug === appSlugFilter)
       : checkSuitesAndMeta.check_suites
 
     // Ignore this Check Run's Check Suite
@@ -204,12 +202,10 @@ async function checkTheCheckSuites(
     // Only take into account the first Check Suite created that matches the `appSlugFilter`
     if (onlyFirstCheckSuite) {
       // Get the first Check Suite created by reducing the array based on the created_at timestamp
-      const firstCheckSuite = checkSuites.reduce((previous, current) => {
+      const firstCheckSuite = checkSuites.reduce((previous: any, current: any) => {
         // Cast to any to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/8
-        /* eslint-disable @typescript-eslint/no-explicit-any */
-        const previousDateString = (previous as any)['created_at'],
-          currentDateString = (current as any)['created_at']
-        /* eslint-enable @typescript-eslint/no-explicit-any */
+        const previousDateString = previous['created_at'],
+          currentDateString = current['created_at']
         if (typeof previousDateString !== 'string' || typeof currentDateString !== 'string') {
           throw new Error(
             `Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '${
@@ -242,11 +238,13 @@ async function checkTheCheckSuites(
   })
 }
 
-async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Octokit.ChecksListSuitesForRefResponse> {
+async function getCheckSuites(
+  options: GetCheckSuitesOptions
+): Promise<GetResponseDataTypeFromEndpointMethod<typeof client.rest.checks.listSuitesForRef>> {
   const {client, owner, repo, ref} = options
 
   return new Promise(async resolve => {
-    const response = await client.checks.listSuitesForRef({
+    const response = await client.rest.checks.listSuitesForRef({
       owner,
       repo,
       ref
@@ -261,7 +259,7 @@ async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Octokit.C
   })
 }
 
-function diagnose(checkSuites: Octokit.ChecksListSuitesForRefResponseCheckSuitesItem[]): SimpleCheckSuiteMeta[] {
+function diagnose(checkSuites: any[]): SimpleCheckSuiteMeta[] {
   return checkSuites.map<SimpleCheckSuiteMeta>(
     checkSuite =>
       ({
@@ -271,13 +269,11 @@ function diagnose(checkSuites: Octokit.ChecksListSuitesForRefResponseCheckSuites
         },
         status: checkSuite.status as CheckSuiteStatus,
         conclusion: checkSuite.conclusion as CheckSuiteConclusion
-      } as SimpleCheckSuiteMeta)
+      }) as SimpleCheckSuiteMeta
   )
 }
 
-function getHighestPriorityCheckSuiteStatus(
-  checkSuites: Octokit.ChecksListSuitesForRefResponseCheckSuitesItem[]
-): CheckSuiteStatus {
+function getHighestPriorityCheckSuiteStatus(checkSuites: any[]): CheckSuiteStatus {
   return checkSuites
     .map(checkSuite => CheckSuiteStatus[checkSuite.status as keyof typeof CheckSuiteStatus])
     .reduce((previous, current, currentIndex) => {
@@ -300,9 +296,7 @@ function getHighestPriorityCheckSuiteStatus(
     }, CheckSuiteStatus.completed)
 }
 
-function getHighestPriorityCheckSuiteConclusion(
-  checkSuites: Octokit.ChecksListSuitesForRefResponseCheckSuitesItem[]
-): CheckSuiteConclusion {
+function getHighestPriorityCheckSuiteConclusion(checkSuites: any[]): CheckSuiteConclusion {
   return checkSuites
     .map(checkSuite => CheckSuiteConclusion[checkSuite.conclusion as keyof typeof CheckSuiteConclusion])
     .reduce((previous, current, currentIndex) => {
