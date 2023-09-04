@@ -266,7 +266,7 @@ function waitForCheckSuites(options) {
     return __awaiter(this, void 0, void 0, function* () {
         const { client, owner, repo, ref, checkSuiteID, waitForACheckSuite, intervalSeconds, timeoutSeconds, appSlugFilter, onlyFirstCheckSuite } = options;
         /* eslint-disable no-async-promise-executor */
-        return new Promise((resolve) => __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             // Check to see if all of the check suites have already completed
             let response = yield checkTheCheckSuites({
                 client,
@@ -326,7 +326,7 @@ function waitForCheckSuites(options) {
             if (timeoutSeconds) {
                 timeoutId = setTimeout(() => {
                     clearInterval(intervalId);
-                    throw new Error(`Timeout of ${timeoutSeconds} seconds reached.`);
+                    reject(new Error(`Timeout of ${timeoutSeconds} seconds reached.`));
                 }, timeoutSeconds * 1000);
             }
         }));
@@ -397,7 +397,8 @@ function checkTheCheckSuites(options) {
                     const currentDateString = current['created_at'];
                     /* eslint-enable @typescript-eslint/no-explicit-any */
                     if (typeof previousDateString !== 'string' || typeof currentDateString !== 'string') {
-                        throw new Error(`Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '${typeof previousDateString === typeof currentDateString
+                        throw new Error(`Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '
+              ${typeof previousDateString === typeof currentDateString
                             ? typeof previousDateString
                             : `${typeof previousDateString} and ${typeof currentDateString}`}'. Please submit an issue on this action's GitHub repo.`);
                     }

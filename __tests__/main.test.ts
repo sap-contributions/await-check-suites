@@ -17,7 +17,7 @@ describe('main', () => {
     // const response = new Response('{}', {headers: []});
 
     // eslint-disable-next-line prettier/prettier
-    (fetch as jest.MockedFunction<typeof fetch>).mockReturnValue(
+    ;(fetch as jest.MockedFunction<typeof fetch>).mockReturnValue(
       new Promise<Response>(resolve => {
         const headers = new Headers()
         headers.append('content-type', 'application/json')
@@ -246,7 +246,7 @@ describe('main', () => {
     // const response = new Response('{}', {headers: []});
 
     // eslint-disable-next-line prettier/prettier
-    (fetch as jest.MockedFunction<typeof fetch>).mockReturnValue(
+    ;(fetch as jest.MockedFunction<typeof fetch>).mockReturnValue(
       new Promise<Response>(resolve => {
         const headers = new Headers()
         headers.append('content-type', 'application/json')
