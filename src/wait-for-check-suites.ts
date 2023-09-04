@@ -73,7 +73,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
   } = options
 
   /* eslint-disable no-async-promise-executor */
-  return new Promise(async resolve => {
+  return new Promise(async (resolve, reject) => {
     // Check to see if all of the check suites have already completed
     let response = await checkTheCheckSuites({
       client,
@@ -138,7 +138,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
     if (timeoutSeconds) {
       timeoutId = setTimeout(() => {
         clearInterval(intervalId)
-        throw new Error(`Timeout of ${timeoutSeconds} seconds reached.`)
+        reject(new Error(`Timeout of ${timeoutSeconds} seconds reached.`))
       }, timeoutSeconds * 1000)
     }
   })
@@ -149,7 +149,7 @@ async function checkTheCheckSuites(
 ): Promise<Exclude<CheckSuiteStatus, CheckSuiteStatus.completed> | CheckSuiteConclusion> {
   const {client, owner, repo, ref, checkSuiteID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite} = options
 
-  return new Promise(async resolve => {
+  return new Promise(async (resolve, reject) => {
     const checkSuitesAndMeta = await getCheckSuites({
       client,
       owner,
@@ -187,8 +187,8 @@ async function checkTheCheckSuites(
       } else if (appSlugFilter) {
         message = `No check suites with the app slug '${appSlugFilter}' exist for this commit.`
       } else {
-        throw new Error(
-          "A Check Suite should exist, but it doesn't. Please submit an issue on this action's GitHub repo."
+        reject(
+          new Error("A Check Suite should exist, but it doesn't. Please submit an issue on this action's GitHub repo.")
         )
       }
       if (waitForACheckSuite) {
@@ -212,12 +212,13 @@ async function checkTheCheckSuites(
         const currentDateString = (current as any)['created_at']
         /* eslint-enable @typescript-eslint/no-explicit-any */
         if (typeof previousDateString !== 'string' || typeof currentDateString !== 'string') {
-          throw new Error(
-            `Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '${
-              typeof previousDateString === typeof currentDateString
-                ? typeof previousDateString
-                : `${typeof previousDateString} and ${typeof currentDateString}`
-            }'. Please submit an issue on this action's GitHub repo.`
+          reject(
+            new Error(`Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '
+              ${
+                typeof previousDateString === typeof currentDateString
+                  ? typeof previousDateString
+                  : `${typeof previousDateString} and ${typeof currentDateString}`
+              }'. Please submit an issue on this action's GitHub repo.`)
           )
         }
         return Date.parse(previousDateString) < Date.parse(currentDateString) ? previous : current
@@ -246,16 +247,18 @@ async function checkTheCheckSuites(
 async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Octokit.ChecksListSuitesForRefResponse> {
   const {client, owner, repo, ref} = options
 
-  return new Promise(async resolve => {
+  return new Promise(async (resolve, reject) => {
     const response = await client.checks.listSuitesForRef({
       owner,
       repo,
       ref
     })
     if (response.status !== 200) {
-      throw new Error(
-        `Failed to list check suites for ${owner}/${repo}@${ref}. ` +
-          `Expected response code 200, got ${response.status}.`
+      reject(
+        new Error(
+          `Failed to list check suites for ${owner}/${repo}@${ref}. ` +
+            `Expected response code 200, got ${response.status}.`
+        )
       )
     }
     resolve(response.data)
