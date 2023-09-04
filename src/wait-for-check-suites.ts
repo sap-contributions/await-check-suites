@@ -149,7 +149,7 @@ async function checkTheCheckSuites(
 ): Promise<Exclude<CheckSuiteStatus, CheckSuiteStatus.completed> | CheckSuiteConclusion> {
   const {client, owner, repo, ref, checkSuiteID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite} = options
 
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async resolve => {
     const checkSuitesAndMeta = await getCheckSuites({
       client,
       owner,
@@ -187,8 +187,8 @@ async function checkTheCheckSuites(
       } else if (appSlugFilter) {
         message = `No check suites with the app slug '${appSlugFilter}' exist for this commit.`
       } else {
-        reject(
-          new Error("A Check Suite should exist, but it doesn't. Please submit an issue on this action's GitHub repo.")
+        throw new Error(
+          "A Check Suite should exist, but it doesn't. Please submit an issue on this action's GitHub repo."
         )
       }
       if (waitForACheckSuite) {
@@ -212,14 +212,12 @@ async function checkTheCheckSuites(
         const currentDateString = (current as any)['created_at']
         /* eslint-enable @typescript-eslint/no-explicit-any */
         if (typeof previousDateString !== 'string' || typeof currentDateString !== 'string') {
-          reject(
-            new Error(`Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '
+          throw new Error(`Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '
               ${
                 typeof previousDateString === typeof currentDateString
                   ? typeof previousDateString
                   : `${typeof previousDateString} and ${typeof currentDateString}`
               }'. Please submit an issue on this action's GitHub repo.`)
-          )
         }
         return Date.parse(previousDateString) < Date.parse(currentDateString) ? previous : current
       })
@@ -247,18 +245,16 @@ async function checkTheCheckSuites(
 async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Octokit.ChecksListSuitesForRefResponse> {
   const {client, owner, repo, ref} = options
 
-  return new Promise(async (resolve, reject) => {
+  return new Promise(async resolve => {
     const response = await client.checks.listSuitesForRef({
       owner,
       repo,
       ref
     })
     if (response.status !== 200) {
-      reject(
-        new Error(
-          `Failed to list check suites for ${owner}/${repo}@${ref}. ` +
-            `Expected response code 200, got ${response.status}.`
-        )
+      throw new Error(
+        `Failed to list check suites for ${owner}/${repo}@${ref}. ` +
+          `Expected response code 200, got ${response.status}.`
       )
     }
     resolve(response.data)
