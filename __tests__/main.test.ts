@@ -3,7 +3,7 @@
 // import * as process from 'process'
 // import * as cp from 'child_process'
 // import * as path from 'path'
-import {GitHub} from '@actions/github'
+import {getOctokit} from '@actions/github'
 import {CheckSuiteConclusion, waitForCheckSuites} from '../src/wait-for-check-suites'
 
 /* eslint-disable @typescript-eslint/promise-function-async */
@@ -226,7 +226,7 @@ describe('main', () => {
     )
 
     const conclusion = await waitForCheckSuites({
-      client: new GitHub('123'),
+      client: getOctokit('123'),
       owner: 'Avenel',
       repo: 'await-check-suite-test',
       ref: '376e38096d7f7ef69af8f4ce7128de82c12269c1',
@@ -457,7 +457,7 @@ describe('main', () => {
     expect.assertions(1)
     try {
       await waitForCheckSuites({
-        client: new GitHub('123'),
+        client: getOctokit('123'),
         owner: 'Avenel',
         repo: 'await-check-suite-test',
         ref: '376e38096d7f7ef69af8f4ce7128de82c12269c1',

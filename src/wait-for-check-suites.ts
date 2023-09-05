@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
-import {GitHub} from '@actions/github'
-import {Octokit} from '@octokit/rest' // imported for types only
+import {GitHub} from '@actions/github/lib/utils'
+import type {GetResponseDataTypeFromEndpointMethod} from '@octokit/types'
 
 // Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
 // All possible Check Suite statuses in descending order of priority
@@ -22,7 +22,7 @@ export enum CheckSuiteConclusion {
 }
 
 interface WaitForCheckSuitesOptions {
-  client: GitHub
+  client: InstanceType<typeof GitHub>
   owner: string
   repo: string
   ref: string
@@ -34,7 +34,7 @@ interface WaitForCheckSuitesOptions {
   onlyFirstCheckSuite: boolean
 }
 interface CheckTheCheckSuitesOptions {
-  client: GitHub
+  client: InstanceType<typeof GitHub>
   owner: string
   repo: string
   ref: string
@@ -44,7 +44,7 @@ interface CheckTheCheckSuitesOptions {
   onlyFirstCheckSuite: boolean
 }
 interface GetCheckSuitesOptions {
-  client: GitHub
+  client: InstanceType<typeof GitHub>
   owner: string
   repo: string
   ref: string
@@ -56,6 +56,22 @@ interface SimpleCheckSuiteMeta {
   }
   status: CheckSuiteStatus
   conclusion: CheckSuiteConclusion
+}
+interface ChecksListSuitesForRefResponseCheckSuitesItem {
+  id: number
+  app: {slug?: string} | null
+  conclusion:
+    | 'success'
+    | 'failure'
+    | 'neutral'
+    | 'cancelled'
+    | 'skipped'
+    | 'timed_out'
+    | 'action_required'
+    | 'startup_failure'
+    | 'stale'
+    | null
+  status: 'queued' | 'in_progress' | 'completed' | 'pending' | null
 }
 
 export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Promise<CheckSuiteConclusion> {
@@ -171,7 +187,7 @@ async function checkTheCheckSuites(
 
     // Filter for Check Suites that match the app slug
     let checkSuites = appSlugFilter
-      ? checkSuitesAndMeta.check_suites.filter(checkSuite => checkSuite.app.slug === appSlugFilter)
+      ? checkSuitesAndMeta.check_suites.filter(checkSuite => checkSuite.app?.slug === appSlugFilter)
       : checkSuitesAndMeta.check_suites
 
     // Ignore this Check Run's Check Suite
@@ -242,11 +258,13 @@ async function checkTheCheckSuites(
   })
 }
 
-async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Octokit.ChecksListSuitesForRefResponse> {
+async function getCheckSuites(
+  options: GetCheckSuitesOptions
+): Promise<GetResponseDataTypeFromEndpointMethod<typeof client.rest.checks.listSuitesForRef>> {
   const {client, owner, repo, ref} = options
 
   return new Promise(async resolve => {
-    const response = await client.checks.listSuitesForRef({
+    const response = await client.rest.checks.listSuitesForRef({
       owner,
       repo,
       ref
@@ -261,22 +279,22 @@ async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Octokit.C
   })
 }
 
-function diagnose(checkSuites: Octokit.ChecksListSuitesForRefResponseCheckSuitesItem[]): SimpleCheckSuiteMeta[] {
+function diagnose(checkSuites: ChecksListSuitesForRefResponseCheckSuitesItem[]): SimpleCheckSuiteMeta[] {
   return checkSuites.map<SimpleCheckSuiteMeta>(
     checkSuite =>
       ({
         id: checkSuite.id,
         app: {
-          slug: checkSuite.app.slug
+          slug: checkSuite.app?.slug
         },
-        status: checkSuite.status as CheckSuiteStatus,
+        status: checkSuite.status,
         conclusion: checkSuite.conclusion as CheckSuiteConclusion
       }) as SimpleCheckSuiteMeta
   )
 }
 
 function getHighestPriorityCheckSuiteStatus(
-  checkSuites: Octokit.ChecksListSuitesForRefResponseCheckSuitesItem[]
+  checkSuites: ChecksListSuitesForRefResponseCheckSuitesItem[]
 ): CheckSuiteStatus {
   return checkSuites
     .map(checkSuite => CheckSuiteStatus[checkSuite.status as keyof typeof CheckSuiteStatus])
@@ -301,7 +319,7 @@ function getHighestPriorityCheckSuiteStatus(
 }
 
 function getHighestPriorityCheckSuiteConclusion(
-  checkSuites: Octokit.ChecksListSuitesForRefResponseCheckSuitesItem[]
+  checkSuites: ChecksListSuitesForRefResponseCheckSuitesItem[]
 ): CheckSuiteConclusion {
   return checkSuites
     .map(checkSuite => CheckSuiteConclusion[checkSuite.conclusion as keyof typeof CheckSuiteConclusion])
