@@ -240,27 +240,27 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.waitForCheckSuites = exports.CheckSuiteConclusion = void 0;
+exports.waitForCheckSuites = exports.CheckSuiteConclusion = exports.CheckSuiteStatus = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 // Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
 // All possible Check Suite statuses in descending order of priority
 /* eslint-disable no-shadow */
 var CheckSuiteStatus;
 (function (CheckSuiteStatus) {
-    CheckSuiteStatus["pending"] = "pending";
-    CheckSuiteStatus["queued"] = "queued";
-    CheckSuiteStatus["in_progress"] = "in_progress";
-    CheckSuiteStatus["completed"] = "completed";
-})(CheckSuiteStatus || (CheckSuiteStatus = {}));
+    CheckSuiteStatus["pending"] = "PENDING";
+    CheckSuiteStatus["queued"] = "QUEUED";
+    CheckSuiteStatus["in_progress"] = "IN_PROGRESS";
+    CheckSuiteStatus["completed"] = "COMPLETED";
+})(CheckSuiteStatus || (exports.CheckSuiteStatus = CheckSuiteStatus = {}));
 // All possible Check Suite conclusions in descending order of priority
 var CheckSuiteConclusion;
 (function (CheckSuiteConclusion) {
-    CheckSuiteConclusion["action_required"] = "action_required";
-    CheckSuiteConclusion["cancelled"] = "cancelled";
-    CheckSuiteConclusion["timed_out"] = "timed_out";
-    CheckSuiteConclusion["failure"] = "failure";
-    CheckSuiteConclusion["neutral"] = "neutral";
-    CheckSuiteConclusion["success"] = "success";
+    CheckSuiteConclusion["action_required"] = "ACTION_REQUIRED";
+    CheckSuiteConclusion["cancelled"] = "CANCELLED";
+    CheckSuiteConclusion["timed_out"] = "TIMED_OUT";
+    CheckSuiteConclusion["failure"] = "FAILURE";
+    CheckSuiteConclusion["neutral"] = "NEUTRAL";
+    CheckSuiteConclusion["success"] = "SUCCESS";
 })(CheckSuiteConclusion || (exports.CheckSuiteConclusion = CheckSuiteConclusion = {}));
 function waitForCheckSuites(options) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -343,7 +343,7 @@ function checkTheCheckSuites(options) {
                 repo,
                 ref
             });
-            if (checkSuitesAndMeta.total_count === 0 || checkSuitesAndMeta.check_suites.length === 0) {
+            if (checkSuitesAndMeta.totalCount === 0 || checkSuitesAndMeta.checkSuites.length === 0) {
                 if (waitForACheckSuite) {
                     core.debug(`No check suites exist for this commit. Waiting for one to show up.`);
                     resolve(CheckSuiteStatus.queued);
@@ -357,10 +357,12 @@ function checkTheCheckSuites(options) {
             }
             // Filter for Check Suites that match the app slug
             let checkSuites = appSlugFilter
-                ? checkSuitesAndMeta.check_suites.filter(checkSuite => { var _a; return ((_a = checkSuite.app) === null || _a === void 0 ? void 0 : _a.slug) === appSlugFilter; })
-                : checkSuitesAndMeta.check_suites;
+                ? checkSuitesAndMeta.checkSuites.filter(checkSuite => { var _a; return ((_a = checkSuite.app) === null || _a === void 0 ? void 0 : _a.slug) === appSlugFilter; })
+                : checkSuitesAndMeta.checkSuites;
             // Ignore this Check Run's Check Suite
-            checkSuites = checkSuites.filter(checkSuite => checkSuiteID !== checkSuite.id);
+            // TODO: Check if encoded checkSuiteID (which is a number) matches the format of the id of the graphql response
+            const encodedChekSuiteID = Buffer.from(`010:CheckSuite${checkSuiteID}`, 'binary').toString('base64');
+            checkSuites = checkSuites.filter(checkSuite => encodedChekSuiteID !== checkSuite.id);
             // Check if there are no more Check Suites after the app slug and Check Suite ID filters
             if (checkSuites.length === 0) {
                 let message = '';
@@ -393,8 +395,8 @@ function checkTheCheckSuites(options) {
                 const firstCheckSuite = checkSuites.reduce((previous, current) => {
                     // Cast to any to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/8
                     /* eslint-disable @typescript-eslint/no-explicit-any */
-                    const previousDateString = previous['created_at'];
-                    const currentDateString = current['created_at'];
+                    const previousDateString = previous.createdAt;
+                    const currentDateString = current.createdAt;
                     /* eslint-enable @typescript-eslint/no-explicit-any */
                     if (typeof previousDateString !== 'string' || typeof currentDateString !== 'string') {
                         throw new Error(`Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '
@@ -429,41 +431,50 @@ function getCheckSuites(options) {
     return __awaiter(this, void 0, void 0, function* () {
         const { client, owner, repo, ref } = options;
         return new Promise((resolve) => __awaiter(this, void 0, void 0, function* () {
-            const response = yield client.rest.checks.listSuitesForRef({
-                owner,
-                repo,
-                ref
-            });
-            if (response.status !== 200) {
-                throw new Error(`Failed to list check suites for ${owner}/${repo}@${ref}. ` +
-                    `Expected response code 200, got ${response.status}.`);
+            try {
+                const query = `{
+        repository(owner: "${owner}", name: "${repo}") {
+            name
+            ref(qualifiedName : "${ref}") {
+                target {
+                    ... on Commit {
+                        checkSuites(first: 100) {
+                            nodes {
+                                id,
+                                app {
+                                    slug,
+                                    name
+                                },
+                                createdAt,
+                                conclusion,
+                                status   
+                            }
+                        }
+                    }
+                }
             }
-            resolve(response.data);
+        }
+      }`;
+                const response = yield client.graphql(query);
+                resolve({
+                    totalCount: response.repository.ref.target.checkSuites.nodes.length,
+                    checkSuites: response.repository.ref.target.checkSuites.nodes
+                });
+            }
+            catch (e) {
+                throw new Error(`Failed to list check suites for ${owner}/${repo}@${ref}. Error: ${e}`);
+            }
         }));
     });
 }
 function diagnose(checkSuites) {
-    return checkSuites.map(checkSuite => {
-        var _a;
-        return ({
-            id: checkSuite.id,
-            app: {
-                slug: (_a = checkSuite.app) === null || _a === void 0 ? void 0 : _a.slug
-            },
-            status: checkSuite.status,
-            conclusion: checkSuite.conclusion
-        });
-    });
+    return checkSuites;
 }
 function getHighestPriorityCheckSuiteStatus(checkSuites) {
     return checkSuites
-        .map(checkSuite => CheckSuiteStatus[checkSuite.status])
-        .reduce((previous, current, currentIndex) => {
+        .map(checkSuite => checkSuite.status)
+        .reduce((previous, current) => {
         for (const status of Object.keys(CheckSuiteStatus)) {
-            if (current === undefined) {
-                throw new Error(`Check suite status '${checkSuites[currentIndex].status}' ('${CheckSuiteStatus[checkSuites[currentIndex].status]}') can't be mapped to one of the CheckSuiteStatus enum's keys. ` +
-                    "Please submit an issue on this action's GitHub repo.");
-            }
             if (previous === status) {
                 return previous;
             }
@@ -475,14 +486,11 @@ function getHighestPriorityCheckSuiteStatus(checkSuites) {
     }, CheckSuiteStatus.completed);
 }
 function getHighestPriorityCheckSuiteConclusion(checkSuites) {
-    return checkSuites
-        .map(checkSuite => CheckSuiteConclusion[checkSuite.conclusion])
-        .reduce((previous, current, currentIndex) => {
+    var _a;
+    return ((_a = checkSuites
+        .map(checkSuite => checkSuite.conclusion)
+        .reduce((previous, current) => {
         for (const conclusion of Object.keys(CheckSuiteConclusion)) {
-            if (current === undefined) {
-                throw new Error(`Check suite conclusion '${checkSuites[currentIndex].conclusion}' ('${CheckSuiteConclusion[checkSuites[currentIndex].conclusion]}') can't be mapped to one of the CheckSuiteConclusion enum's keys. ` +
-                    "Please submit an issue on this action's GitHub repo.");
-            }
             if (previous === conclusion) {
                 return previous;
             }
@@ -491,7 +499,7 @@ function getHighestPriorityCheckSuiteConclusion(checkSuites) {
             }
         }
         return current;
-    }, CheckSuiteConclusion.success);
+    }, CheckSuiteConclusion.success)) !== null && _a !== void 0 ? _a : CheckSuiteConclusion.success);
 }
 
 

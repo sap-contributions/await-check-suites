@@ -1,24 +1,23 @@
 import * as core from '@actions/core'
 import {GitHub} from '@actions/github/lib/utils'
-import type {GetResponseDataTypeFromEndpointMethod} from '@octokit/types'
 
 // Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
 // All possible Check Suite statuses in descending order of priority
 /* eslint-disable no-shadow */
-enum CheckSuiteStatus {
-  pending = 'pending',
-  queued = 'queued',
-  in_progress = 'in_progress',
-  completed = 'completed'
+export enum CheckSuiteStatus {
+  pending = 'PENDING',
+  queued = 'QUEUED',
+  in_progress = 'IN_PROGRESS',
+  completed = 'COMPLETED'
 }
 // All possible Check Suite conclusions in descending order of priority
 export enum CheckSuiteConclusion {
-  action_required = 'action_required',
-  cancelled = 'cancelled',
-  timed_out = 'timed_out',
-  failure = 'failure',
-  neutral = 'neutral',
-  success = 'success'
+  action_required = 'ACTION_REQUIRED',
+  cancelled = 'CANCELLED',
+  timed_out = 'TIMED_OUT',
+  failure = 'FAILURE',
+  neutral = 'NEUTRAL',
+  success = 'SUCCESS'
 }
 
 interface WaitForCheckSuitesOptions {
@@ -49,29 +48,41 @@ interface GetCheckSuitesOptions {
   repo: string
   ref: string
 }
-interface SimpleCheckSuiteMeta {
-  id: number
-  app: {
-    slug: string
-  }
-  status: CheckSuiteStatus
-  conclusion: CheckSuiteConclusion
+
+export interface RepositoryResult {
+  repository: Repository
 }
-interface ChecksListSuitesForRefResponseCheckSuitesItem {
-  id: number
+
+export interface Repository {
+  ref: Ref
+}
+
+export interface Ref {
+  target: Target
+}
+
+export interface Target {
+  checkSuites: CheckSuiteEdges
+}
+
+export interface CheckSuiteEdges {
+  nodes: CheckSuite[]
+}
+
+export interface CheckSuite {
+  id: string
   app: {slug?: string} | null
-  conclusion:
-    | 'success'
-    | 'failure'
-    | 'neutral'
-    | 'cancelled'
-    | 'skipped'
-    | 'timed_out'
-    | 'action_required'
-    | 'startup_failure'
-    | 'stale'
-    | null
-  status: 'queued' | 'in_progress' | 'completed' | 'pending' | null
+  createdAt: string
+
+  // The conclusion can be null, e.g. if the status of the CheckSuite is Pending.
+  conclusion: CheckSuiteConclusion | undefined
+
+  status: CheckSuiteStatus
+}
+
+interface CheckSuitesForRepositoryResult {
+  totalCount: number
+  checkSuites: CheckSuite[]
 }
 
 export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Promise<CheckSuiteConclusion> {
@@ -173,7 +184,7 @@ async function checkTheCheckSuites(
       ref
     })
 
-    if (checkSuitesAndMeta.total_count === 0 || checkSuitesAndMeta.check_suites.length === 0) {
+    if (checkSuitesAndMeta.totalCount === 0 || checkSuitesAndMeta.checkSuites.length === 0) {
       if (waitForACheckSuite) {
         core.debug(`No check suites exist for this commit. Waiting for one to show up.`)
         resolve(CheckSuiteStatus.queued)
@@ -187,11 +198,13 @@ async function checkTheCheckSuites(
 
     // Filter for Check Suites that match the app slug
     let checkSuites = appSlugFilter
-      ? checkSuitesAndMeta.check_suites.filter(checkSuite => checkSuite.app?.slug === appSlugFilter)
-      : checkSuitesAndMeta.check_suites
+      ? checkSuitesAndMeta.checkSuites.filter(checkSuite => checkSuite.app?.slug === appSlugFilter)
+      : checkSuitesAndMeta.checkSuites
 
     // Ignore this Check Run's Check Suite
-    checkSuites = checkSuites.filter(checkSuite => checkSuiteID !== checkSuite.id)
+    // TODO: Check if encoded checkSuiteID (which is a number) matches the format of the id of the graphql response
+    const encodedChekSuiteID = Buffer.from(`010:CheckSuite${checkSuiteID}`, 'binary').toString('base64')
+    checkSuites = checkSuites.filter(checkSuite => encodedChekSuiteID !== checkSuite.id)
 
     // Check if there are no more Check Suites after the app slug and Check Suite ID filters
     if (checkSuites.length === 0) {
@@ -224,8 +237,8 @@ async function checkTheCheckSuites(
       const firstCheckSuite = checkSuites.reduce((previous, current) => {
         // Cast to any to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/8
         /* eslint-disable @typescript-eslint/no-explicit-any */
-        const previousDateString = (previous as any)['created_at']
-        const currentDateString = (current as any)['created_at']
+        const previousDateString = previous.createdAt
+        const currentDateString = current.createdAt
         /* eslint-enable @typescript-eslint/no-explicit-any */
         if (typeof previousDateString !== 'string' || typeof currentDateString !== 'string') {
           throw new Error(`Expected ChecksListSuitesForRefResponseCheckSuitesItem to have the property 'created_at' with type 'string' but got '
@@ -258,56 +271,56 @@ async function checkTheCheckSuites(
   })
 }
 
-async function getCheckSuites(
-  options: GetCheckSuitesOptions
-): Promise<GetResponseDataTypeFromEndpointMethod<typeof client.rest.checks.listSuitesForRef>> {
+async function getCheckSuites(options: GetCheckSuitesOptions): Promise<CheckSuitesForRepositoryResult> {
   const {client, owner, repo, ref} = options
 
   return new Promise(async resolve => {
-    const response = await client.rest.checks.listSuitesForRef({
-      owner,
-      repo,
-      ref
-    })
-    if (response.status !== 200) {
-      throw new Error(
-        `Failed to list check suites for ${owner}/${repo}@${ref}. ` +
-          `Expected response code 200, got ${response.status}.`
-      )
+    try {
+      const query = `{
+        repository(owner: "${owner}", name: "${repo}") {
+            name
+            ref(qualifiedName : "${ref}") {
+                target {
+                    ... on Commit {
+                        checkSuites(first: 100) {
+                            nodes {
+                                id,
+                                app {
+                                    slug,
+                                    name
+                                },
+                                createdAt,
+                                conclusion,
+                                status   
+                            }
+                        }
+                    }
+                }
+            }
+        }
+      }`
+
+      const response = await client.graphql<RepositoryResult>(query)
+
+      resolve({
+        totalCount: response.repository.ref.target.checkSuites.nodes.length,
+        checkSuites: response.repository.ref.target.checkSuites.nodes
+      })
+    } catch (e) {
+      throw new Error(`Failed to list check suites for ${owner}/${repo}@${ref}. Error: ${e}`)
     }
-    resolve(response.data)
   })
 }
 
-function diagnose(checkSuites: ChecksListSuitesForRefResponseCheckSuitesItem[]): SimpleCheckSuiteMeta[] {
-  return checkSuites.map<SimpleCheckSuiteMeta>(
-    checkSuite =>
-      ({
-        id: checkSuite.id,
-        app: {
-          slug: checkSuite.app?.slug
-        },
-        status: checkSuite.status,
-        conclusion: checkSuite.conclusion as CheckSuiteConclusion
-      }) as SimpleCheckSuiteMeta
-  )
+function diagnose(checkSuites: CheckSuite[]): CheckSuite[] {
+  return checkSuites
 }
 
-function getHighestPriorityCheckSuiteStatus(
-  checkSuites: ChecksListSuitesForRefResponseCheckSuitesItem[]
-): CheckSuiteStatus {
+function getHighestPriorityCheckSuiteStatus(checkSuites: CheckSuite[]): CheckSuiteStatus {
   return checkSuites
-    .map(checkSuite => CheckSuiteStatus[checkSuite.status as keyof typeof CheckSuiteStatus])
-    .reduce((previous, current, currentIndex) => {
+    .map(checkSuite => checkSuite.status)
+    .reduce((previous, current) => {
       for (const status of Object.keys(CheckSuiteStatus)) {
-        if (current === undefined) {
-          throw new Error(
-            `Check suite status '${checkSuites[currentIndex].status}' ('${
-              CheckSuiteStatus[checkSuites[currentIndex].status as keyof typeof CheckSuiteStatus]
-            }') can't be mapped to one of the CheckSuiteStatus enum's keys. ` +
-              "Please submit an issue on this action's GitHub repo."
-          )
-        }
         if (previous === status) {
           return previous
         } else if (current === status) {
@@ -318,27 +331,19 @@ function getHighestPriorityCheckSuiteStatus(
     }, CheckSuiteStatus.completed)
 }
 
-function getHighestPriorityCheckSuiteConclusion(
-  checkSuites: ChecksListSuitesForRefResponseCheckSuitesItem[]
-): CheckSuiteConclusion {
-  return checkSuites
-    .map(checkSuite => CheckSuiteConclusion[checkSuite.conclusion as keyof typeof CheckSuiteConclusion])
-    .reduce((previous, current, currentIndex) => {
-      for (const conclusion of Object.keys(CheckSuiteConclusion)) {
-        if (current === undefined) {
-          throw new Error(
-            `Check suite conclusion '${checkSuites[currentIndex].conclusion}' ('${
-              CheckSuiteConclusion[checkSuites[currentIndex].conclusion as keyof typeof CheckSuiteConclusion]
-            }') can't be mapped to one of the CheckSuiteConclusion enum's keys. ` +
-              "Please submit an issue on this action's GitHub repo."
-          )
+function getHighestPriorityCheckSuiteConclusion(checkSuites: CheckSuite[]): CheckSuiteConclusion {
+  return (
+    checkSuites
+      .map(checkSuite => checkSuite.conclusion)
+      .reduce((previous, current) => {
+        for (const conclusion of Object.keys(CheckSuiteConclusion)) {
+          if (previous === conclusion) {
+            return previous
+          } else if (current === conclusion) {
+            return current
+          }
         }
-        if (previous === conclusion) {
-          return previous
-        } else if (current === conclusion) {
-          return current
-        }
-      }
-      return current
-    }, CheckSuiteConclusion.success)
+        return current
+      }, CheckSuiteConclusion.success) ?? CheckSuiteConclusion.success
+  )
 }
