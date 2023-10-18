@@ -73,6 +73,7 @@ function getInput() {
             }
             // short-term workaround until @actions/github and @octokit/rest are updated to match actual responses
             /* eslint-disable @typescript-eslint/no-explicit-any */
+            core.info(`getWorkflowRun Response Data:\n${JSON.stringify(response.data)}`);
             const checkSuiteIDString = response.data.check_suite_url.split('/').pop();
             if (!checkSuiteIDString) {
                 throw new Error(`Expected the check_suite_url property to be returned in the getWorkflowRun API call, but it isn't (${response.data.check_suite_url} as ${typeof response.data.check_suite_url}). Please submit an issue on this action's GitHub repo.`);

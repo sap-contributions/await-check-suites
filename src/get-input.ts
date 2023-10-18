@@ -58,6 +58,7 @@ export async function getInput(): Promise<Inputs> {
     }
     // short-term workaround until @actions/github and @octokit/rest are updated to match actual responses
     /* eslint-disable @typescript-eslint/no-explicit-any */
+    core.info(`getWorkflowRun Response Data:\n${JSON.stringify(response.data)}`)
     const checkSuiteIDString: string | undefined = ((response.data as any).check_suite_url as string).split('/').pop()
     if (!checkSuiteIDString) {
       throw new Error(
