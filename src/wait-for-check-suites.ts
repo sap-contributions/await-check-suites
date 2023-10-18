@@ -1,24 +1,7 @@
 import * as core from '@actions/core'
 import {GitHub} from '@actions/github/lib/utils'
-
-// Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
-// All possible Check Suite statuses in descending order of priority
-/* eslint-disable no-shadow */
-export enum CheckSuiteStatus {
-  pending = 'PENDING',
-  queued = 'QUEUED',
-  in_progress = 'IN_PROGRESS',
-  completed = 'COMPLETED'
-}
-// All possible Check Suite conclusions in descending order of priority
-export enum CheckSuiteConclusion {
-  action_required = 'ACTION_REQUIRED',
-  cancelled = 'CANCELLED',
-  timed_out = 'TIMED_OUT',
-  failure = 'FAILURE',
-  neutral = 'NEUTRAL',
-  success = 'SUCCESS'
-}
+import {CheckSuiteConclusion, CheckSuiteStatus, getCheckSuites} from './github-api-interactions'
+import {diagnose, getHighestPriorityCheckSuiteConclusion, getHighestPriorityCheckSuiteStatus} from './helper'
 
 interface WaitForCheckSuitesOptions {
   client: InstanceType<typeof GitHub>
@@ -41,48 +24,6 @@ interface CheckTheCheckSuitesOptions {
   waitForACheckSuite: boolean
   appSlugFilter: string | null
   onlyFirstCheckSuite: boolean
-}
-interface GetCheckSuitesOptions {
-  client: InstanceType<typeof GitHub>
-  owner: string
-  repo: string
-  ref: string
-}
-
-export interface RepositoryResult {
-  repository: Repository
-}
-
-export interface Repository {
-  ref: Ref
-}
-
-export interface Ref {
-  target: Target
-}
-
-export interface Target {
-  checkSuites: CheckSuiteEdges
-}
-
-export interface CheckSuiteEdges {
-  nodes: CheckSuite[]
-}
-
-export interface CheckSuite {
-  id: string
-  app: {slug?: string} | null
-  createdAt: string
-
-  // The conclusion can be null, e.g. if the status of the CheckSuite is Pending.
-  conclusion: CheckSuiteConclusion | undefined
-
-  status: CheckSuiteStatus
-}
-
-interface CheckSuitesForRepositoryResult {
-  totalCount: number
-  checkSuites: CheckSuite[]
 }
 
 export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Promise<CheckSuiteConclusion> {
@@ -112,13 +53,13 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
       appSlugFilter,
       onlyFirstCheckSuite
     })
-    if (response === CheckSuiteConclusion.success) {
-      resolve(CheckSuiteConclusion.success)
+    if (response === CheckSuiteConclusion.SUCCESS) {
+      resolve(CheckSuiteConclusion.SUCCESS)
       return
     } else if (
-      response !== CheckSuiteStatus.pending &&
-      response !== CheckSuiteStatus.queued &&
-      response !== CheckSuiteStatus.in_progress
+      response !== CheckSuiteStatus.PENDING &&
+      response !== CheckSuiteStatus.QUEUED &&
+      response !== CheckSuiteStatus.IN_PROGRESS
     ) {
       resolve(response)
       return
@@ -140,17 +81,17 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
         appSlugFilter,
         onlyFirstCheckSuite
       })
-      if (response === CheckSuiteConclusion.success) {
+      if (response === CheckSuiteConclusion.SUCCESS) {
         if (timeoutId) {
           clearTimeout(timeoutId)
         }
         clearInterval(intervalId)
-        resolve(CheckSuiteConclusion.success)
+        resolve(CheckSuiteConclusion.SUCCESS)
         return
       } else if (
-        response !== CheckSuiteStatus.pending &&
-        response !== CheckSuiteStatus.queued &&
-        response !== CheckSuiteStatus.in_progress
+        response !== CheckSuiteStatus.PENDING &&
+        response !== CheckSuiteStatus.QUEUED &&
+        response !== CheckSuiteStatus.IN_PROGRESS
       ) {
         if (timeoutId) {
           clearTimeout(timeoutId)
@@ -173,7 +114,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
 
 async function checkTheCheckSuites(
   options: CheckTheCheckSuitesOptions
-): Promise<Exclude<CheckSuiteStatus, CheckSuiteStatus.completed> | CheckSuiteConclusion> {
+): Promise<Exclude<CheckSuiteStatus, CheckSuiteStatus.COMPLETED> | CheckSuiteConclusion> {
   const {client, owner, repo, ref, checkSuiteID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite} = options
 
   return new Promise(async resolve => {
@@ -187,11 +128,11 @@ async function checkTheCheckSuites(
     if (checkSuitesAndMeta.totalCount === 0 || checkSuitesAndMeta.checkSuites.length === 0) {
       if (waitForACheckSuite) {
         core.debug(`No check suites exist for this commit. Waiting for one to show up.`)
-        resolve(CheckSuiteStatus.queued)
+        resolve(CheckSuiteStatus.QUEUED)
         return
       } else {
         core.info('No check suites exist for this commit.')
-        resolve(CheckSuiteConclusion.success)
+        resolve(CheckSuiteConclusion.SUCCESS)
         return
       }
     }
@@ -222,11 +163,11 @@ async function checkTheCheckSuites(
       }
       if (waitForACheckSuite) {
         core.debug(`${message} Waiting for one to show up.`)
-        resolve(CheckSuiteStatus.queued)
+        resolve(CheckSuiteStatus.QUEUED)
         return
       } else {
         core.info(message)
-        resolve(CheckSuiteConclusion.success)
+        resolve(CheckSuiteConclusion.SUCCESS)
         return
       }
     }
@@ -256,10 +197,10 @@ async function checkTheCheckSuites(
     }
 
     const highestPriorityCheckSuiteStatus = getHighestPriorityCheckSuiteStatus(checkSuites)
-    if (highestPriorityCheckSuiteStatus === CheckSuiteStatus.completed) {
+    if (highestPriorityCheckSuiteStatus === CheckSuiteStatus.COMPLETED) {
       const highestPriorityCheckSuiteConclusion = getHighestPriorityCheckSuiteConclusion(checkSuites)
-      if (highestPriorityCheckSuiteConclusion === CheckSuiteConclusion.success) {
-        resolve(CheckSuiteConclusion.success)
+      if (highestPriorityCheckSuiteConclusion === CheckSuiteConclusion.SUCCESS) {
+        resolve(CheckSuiteConclusion.SUCCESS)
       } else {
         core.error('One or more check suites were unsuccessful. Below is some metadata on the check suites.')
         core.error(JSON.stringify(diagnose(checkSuites)))
@@ -269,81 +210,4 @@ async function checkTheCheckSuites(
       resolve(highestPriorityCheckSuiteStatus)
     }
   })
-}
-
-async function getCheckSuites(options: GetCheckSuitesOptions): Promise<CheckSuitesForRepositoryResult> {
-  const {client, owner, repo, ref} = options
-
-  return new Promise(async resolve => {
-    try {
-      const query = `{
-        repository(owner: "${owner}", name: "${repo}") {
-            name
-            ref(qualifiedName : "${ref}") {
-                target {
-                    ... on Commit {
-                        checkSuites(first: 100) {
-                            nodes {
-                                id,
-                                app {
-                                    slug,
-                                    name
-                                },
-                                createdAt,
-                                conclusion,
-                                status   
-                            }
-                        }
-                    }
-                }
-            }
-        }
-      }`
-
-      const response = await client.graphql<RepositoryResult>(query)
-
-      resolve({
-        totalCount: response.repository.ref.target.checkSuites.nodes.length,
-        checkSuites: response.repository.ref.target.checkSuites.nodes
-      })
-    } catch (e) {
-      throw new Error(`Failed to list check suites for ${owner}/${repo}@${ref}. Error: ${e}`)
-    }
-  })
-}
-
-function diagnose(checkSuites: CheckSuite[]): CheckSuite[] {
-  return checkSuites
-}
-
-function getHighestPriorityCheckSuiteStatus(checkSuites: CheckSuite[]): CheckSuiteStatus {
-  return checkSuites
-    .map(checkSuite => checkSuite.status)
-    .reduce((previous, current) => {
-      for (const status of Object.keys(CheckSuiteStatus)) {
-        if (previous === status) {
-          return previous
-        } else if (current === status) {
-          return current
-        }
-      }
-      return current
-    }, CheckSuiteStatus.completed)
-}
-
-function getHighestPriorityCheckSuiteConclusion(checkSuites: CheckSuite[]): CheckSuiteConclusion {
-  return (
-    checkSuites
-      .map(checkSuite => checkSuite.conclusion)
-      .reduce((previous, current) => {
-        for (const conclusion of Object.keys(CheckSuiteConclusion)) {
-          if (previous === conclusion) {
-            return previous
-          } else if (current === conclusion) {
-            return current
-          }
-        }
-        return current
-      }, CheckSuiteConclusion.success) ?? CheckSuiteConclusion.success
-  )
 }

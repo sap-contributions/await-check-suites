@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import {getInput} from './get-input'
-import {CheckSuiteConclusion, waitForCheckSuites} from './wait-for-check-suites'
+import {waitForCheckSuites} from './wait-for-check-suites'
+import {CheckSuiteConclusion} from './github-api-interactions'
 
 async function run(): Promise<void> {
   try {
@@ -35,7 +36,7 @@ async function run(): Promise<void> {
 
     core.setOutput('conclusion', conclusion)
 
-    if (conclusion !== CheckSuiteConclusion.success && failStepIfUnsuccessful) {
+    if (conclusion !== CheckSuiteConclusion.SUCCESS && failStepIfUnsuccessful) {
       core.setFailed('One or more of the check suites were unsuccessful.')
     }
     /* eslint-disable @typescript-eslint/no-explicit-any */
