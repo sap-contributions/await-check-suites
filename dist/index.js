@@ -114,10 +114,33 @@ exports.getInput = getInput;
 /***/ }),
 
 /***/ 2642:
-/***/ (function(__unused_webpack_module, exports) {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -129,6 +152,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getCheckSuites = exports.CheckSuiteConclusion = exports.CheckSuiteStatus = void 0;
+const core = __importStar(__nccwpck_require__(2186));
 // Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
 // All possible Check Suite statuses in descending order of priority
 /* eslint-disable no-shadow */
@@ -157,26 +181,27 @@ function getCheckSuites(options) {
             try {
                 const query = `{
         repository(owner: "${owner}", name: "${repo}") {
-            name
-            object(oid: "${ref}") {
-                ... on Commit {
-                    checkSuites(first: 100) {
-                        nodes {
-                            id,
-                            app {
-                                slug,
-                                name
-                            },
-                            createdAt,
-                            conclusion,
-                            status   
-                        }
-                    }
+          name
+          object(oid: "${ref}") {
+            ... on Commit {
+              checkSuites(first: 100) {
+                nodes {
+                  id,
+                  app {
+                      slug,
+                      name
+                  },
+                  createdAt,
+                  conclusion,
+                  status   
                 }
+              }
             }
+          }
         }
       }`;
                 const response = yield client.graphql(query);
+                core.info(`CheckSuites: ${JSON.stringify(response.repository.object.checkSuites.nodes)}`);
                 resolve({
                     totalCount: response.repository.object.checkSuites.nodes.length,
                     checkSuites: response.repository.object.checkSuites.nodes
@@ -288,6 +313,7 @@ function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             const { client, owner, repo, ref, checkSuiteID, waitForACheckSuite, intervalSeconds, timeoutSeconds, failStepIfUnsuccessful, appSlugFilter, onlyFirstCheckSuite } = yield (0, get_input_1.getInput)();
+            core.info(`Id of CheckSuiteID: ${checkSuiteID}`);
             const conclusion = yield (0, wait_for_check_suites_1.waitForCheckSuites)({
                 client,
                 owner,
