@@ -68,10 +68,7 @@ export async function getInput(): Promise<Inputs> {
     }
     /* eslint-enable @typescript-eslint/no-explicit-any */
     checkSuiteID = parseInt(checkSuiteIDString)
-    console.log(`CheckSuiteID: `, checkSuiteID, ' derived from String: ', checkSuiteIDString)
   }
-
-  console.log(`Parsed CheckSuiteID: `, checkSuiteID);
 
   if (checkSuiteID !== null && isNaN(checkSuiteID)) {
     throw new Error(

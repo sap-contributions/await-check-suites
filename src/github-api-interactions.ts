@@ -1,3 +1,4 @@
+import * as core from '@actions/core'
 import {GitHub} from '@actions/github/lib/utils'
 
 export interface GetCheckSuitesOptions {
@@ -88,6 +89,8 @@ export async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Ch
       }`
 
       const response = await client.graphql<RepositoryResult>(query)
+
+      core.info(`CheckSuites: ${JSON.stringify(response.repository.object.checkSuites.nodes)}`)
 
       resolve({
         totalCount: response.repository.object.checkSuites.nodes.length,

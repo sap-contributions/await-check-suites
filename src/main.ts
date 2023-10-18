@@ -19,6 +19,8 @@ async function run(): Promise<void> {
       onlyFirstCheckSuite
     } = await getInput()
 
+    core.info(`Id of CheckSuiteID: ${checkSuiteID}`)
+
     const conclusion = await waitForCheckSuites({
       client,
       owner,
