@@ -68,7 +68,11 @@ export async function getInput(): Promise<Inputs> {
     }
     /* eslint-enable @typescript-eslint/no-explicit-any */
     checkSuiteID = parseInt(checkSuiteIDString)
+    console.log(`CheckSuiteID: `, checkSuiteID, ' derived from String: ', checkSuiteIDString)
   }
+
+  console.log(`Parsed CheckSuiteID: `, checkSuiteID);
+
   if (checkSuiteID !== null && isNaN(checkSuiteID)) {
     throw new Error(
       `Expected the environment variable $GITHUB_RUN_ID to be a number but it isn't (${checkSuiteID} as ${typeof checkSuiteID}). ` +

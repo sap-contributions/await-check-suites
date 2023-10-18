@@ -67,23 +67,23 @@ export async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Ch
     try {
       const query = `{
         repository(owner: "${owner}", name: "${repo}") {
-            name
-            object(oid: "${ref}") {
-                ... on Commit {
-                    checkSuites(first: 100) {
-                        nodes {
-                            id,
-                            app {
-                                slug,
-                                name
-                            },
-                            createdAt,
-                            conclusion,
-                            status   
-                        }
-                    }
+          name
+          object(oid: "${ref}") {
+            ... on Commit {
+              checkSuites(first: 100) {
+                nodes {
+                  id,
+                  app {
+                      slug,
+                      name
+                  },
+                  createdAt,
+                  conclusion,
+                  status   
                 }
+              }
             }
+          }
         }
       }`
 
