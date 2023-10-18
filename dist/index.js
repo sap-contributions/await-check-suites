@@ -113,6 +113,137 @@ exports.getInput = getInput;
 
 /***/ }),
 
+/***/ 2642:
+/***/ (function(__unused_webpack_module, exports) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getCheckSuites = exports.CheckSuiteConclusion = exports.CheckSuiteStatus = void 0;
+// Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
+// All possible Check Suite statuses in descending order of priority
+/* eslint-disable no-shadow */
+var CheckSuiteStatus;
+(function (CheckSuiteStatus) {
+    CheckSuiteStatus["PENDING"] = "PENDING";
+    CheckSuiteStatus["QUEUED"] = "QUEUED";
+    CheckSuiteStatus["IN_PROGRESS"] = "IN_PROGRESS";
+    CheckSuiteStatus["COMPLETED"] = "COMPLETED";
+})(CheckSuiteStatus || (exports.CheckSuiteStatus = CheckSuiteStatus = {}));
+// All possible Check Suite conclusions in descending order of priority
+var CheckSuiteConclusion;
+(function (CheckSuiteConclusion) {
+    CheckSuiteConclusion["ACTION_REQUIRED"] = "ACTION_REQUIRED";
+    CheckSuiteConclusion["CANCELLED"] = "CANCELLED";
+    CheckSuiteConclusion["TIMED_OUT"] = "TIMED_OUT";
+    CheckSuiteConclusion["FAILURE"] = "FAILURE";
+    CheckSuiteConclusion["NEUTRAL"] = "NEUTRAL";
+    CheckSuiteConclusion["SUCCESS"] = "SUCCESS";
+})(CheckSuiteConclusion || (exports.CheckSuiteConclusion = CheckSuiteConclusion = {}));
+function getCheckSuites(options) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { client, owner, repo, ref } = options;
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const query = `{
+          repository(owner: "${owner}", name: "${repo}") {
+              name
+              ref(qualifiedName : "${ref}") {
+                  target {
+                      ... on Commit {
+                          checkSuites(first: 100) {
+                              nodes {
+                                  id,
+                                  app {
+                                      slug,
+                                      name
+                                  },
+                                  createdAt,
+                                  conclusion,
+                                  status   
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+        }`;
+                const response = yield client.graphql(query);
+                resolve({
+                    totalCount: response.repository.ref.target.checkSuites.nodes.length,
+                    checkSuites: response.repository.ref.target.checkSuites.nodes
+                });
+            }
+            catch (e) {
+                reject(e);
+            }
+        }));
+    });
+}
+exports.getCheckSuites = getCheckSuites;
+
+
+/***/ }),
+
+/***/ 3947:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.diagnose = exports.getHighestPriorityCheckSuiteConclusion = exports.getHighestPriorityCheckSuiteStatus = void 0;
+const github_api_interactions_1 = __nccwpck_require__(2642);
+function getHighestPriorityCheckSuiteStatus(checkSuites) {
+    return checkSuites
+        .map(checkSuite => checkSuite.status)
+        .reduce((previous, current) => {
+        for (const status of Object.keys(github_api_interactions_1.CheckSuiteStatus)) {
+            if (previous === status) {
+                return previous;
+            }
+            else if (current === status) {
+                return current;
+            }
+        }
+        return current;
+    }, github_api_interactions_1.CheckSuiteStatus.COMPLETED);
+}
+exports.getHighestPriorityCheckSuiteStatus = getHighestPriorityCheckSuiteStatus;
+function getHighestPriorityCheckSuiteConclusion(checkSuites) {
+    var _a;
+    return ((_a = checkSuites
+        .map(checkSuite => checkSuite.conclusion)
+        .reduce((previous, current) => {
+        for (const conclusion of Object.keys(github_api_interactions_1.CheckSuiteConclusion)) {
+            if (previous === conclusion) {
+                return previous;
+            }
+            else if (current === conclusion) {
+                return current;
+            }
+        }
+        return current;
+    }, github_api_interactions_1.CheckSuiteConclusion.SUCCESS)) !== null && _a !== void 0 ? _a : github_api_interactions_1.CheckSuiteConclusion.SUCCESS);
+}
+exports.getHighestPriorityCheckSuiteConclusion = getHighestPriorityCheckSuiteConclusion;
+function diagnose(checkSuites) {
+    return checkSuites;
+}
+exports.diagnose = diagnose;
+
+
+/***/ }),
+
 /***/ 3109:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -154,6 +285,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
 const get_input_1 = __nccwpck_require__(742);
 const wait_for_check_suites_1 = __nccwpck_require__(119);
+const github_api_interactions_1 = __nccwpck_require__(2642);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -172,7 +304,7 @@ function run() {
             });
             core.info(`Conclusion: ${conclusion}`);
             core.setOutput('conclusion', conclusion);
-            if (conclusion !== wait_for_check_suites_1.CheckSuiteConclusion.success && failStepIfUnsuccessful) {
+            if (conclusion !== github_api_interactions_1.CheckSuiteConclusion.SUCCESS && failStepIfUnsuccessful) {
                 core.setFailed('One or more of the check suites were unsuccessful.');
             }
             /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -240,28 +372,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.waitForCheckSuites = exports.CheckSuiteConclusion = exports.CheckSuiteStatus = void 0;
+exports.waitForCheckSuites = void 0;
 const core = __importStar(__nccwpck_require__(2186));
-// Define these enums to workaround https://github.com/octokit/plugin-rest-endpoint-methods.js/issues/9
-// All possible Check Suite statuses in descending order of priority
-/* eslint-disable no-shadow */
-var CheckSuiteStatus;
-(function (CheckSuiteStatus) {
-    CheckSuiteStatus["pending"] = "PENDING";
-    CheckSuiteStatus["queued"] = "QUEUED";
-    CheckSuiteStatus["in_progress"] = "IN_PROGRESS";
-    CheckSuiteStatus["completed"] = "COMPLETED";
-})(CheckSuiteStatus || (exports.CheckSuiteStatus = CheckSuiteStatus = {}));
-// All possible Check Suite conclusions in descending order of priority
-var CheckSuiteConclusion;
-(function (CheckSuiteConclusion) {
-    CheckSuiteConclusion["action_required"] = "ACTION_REQUIRED";
-    CheckSuiteConclusion["cancelled"] = "CANCELLED";
-    CheckSuiteConclusion["timed_out"] = "TIMED_OUT";
-    CheckSuiteConclusion["failure"] = "FAILURE";
-    CheckSuiteConclusion["neutral"] = "NEUTRAL";
-    CheckSuiteConclusion["success"] = "SUCCESS";
-})(CheckSuiteConclusion || (exports.CheckSuiteConclusion = CheckSuiteConclusion = {}));
+const github_api_interactions_1 = __nccwpck_require__(2642);
+const helper_1 = __nccwpck_require__(3947);
 function waitForCheckSuites(options) {
     return __awaiter(this, void 0, void 0, function* () {
         const { client, owner, repo, ref, checkSuiteID, waitForACheckSuite, intervalSeconds, timeoutSeconds, appSlugFilter, onlyFirstCheckSuite } = options;
@@ -278,13 +392,13 @@ function waitForCheckSuites(options) {
                 appSlugFilter,
                 onlyFirstCheckSuite
             });
-            if (response === CheckSuiteConclusion.success) {
-                resolve(CheckSuiteConclusion.success);
+            if (response === github_api_interactions_1.CheckSuiteConclusion.SUCCESS) {
+                resolve(github_api_interactions_1.CheckSuiteConclusion.SUCCESS);
                 return;
             }
-            else if (response !== CheckSuiteStatus.pending &&
-                response !== CheckSuiteStatus.queued &&
-                response !== CheckSuiteStatus.in_progress) {
+            else if (response !== github_api_interactions_1.CheckSuiteStatus.PENDING &&
+                response !== github_api_interactions_1.CheckSuiteStatus.QUEUED &&
+                response !== github_api_interactions_1.CheckSuiteStatus.IN_PROGRESS) {
                 resolve(response);
                 return;
             }
@@ -303,17 +417,17 @@ function waitForCheckSuites(options) {
                     appSlugFilter,
                     onlyFirstCheckSuite
                 });
-                if (response === CheckSuiteConclusion.success) {
+                if (response === github_api_interactions_1.CheckSuiteConclusion.SUCCESS) {
                     if (timeoutId) {
                         clearTimeout(timeoutId);
                     }
                     clearInterval(intervalId);
-                    resolve(CheckSuiteConclusion.success);
+                    resolve(github_api_interactions_1.CheckSuiteConclusion.SUCCESS);
                     return;
                 }
-                else if (response !== CheckSuiteStatus.pending &&
-                    response !== CheckSuiteStatus.queued &&
-                    response !== CheckSuiteStatus.in_progress) {
+                else if (response !== github_api_interactions_1.CheckSuiteStatus.PENDING &&
+                    response !== github_api_interactions_1.CheckSuiteStatus.QUEUED &&
+                    response !== github_api_interactions_1.CheckSuiteStatus.IN_PROGRESS) {
                     if (timeoutId) {
                         clearTimeout(timeoutId);
                     }
@@ -337,7 +451,7 @@ function checkTheCheckSuites(options) {
     return __awaiter(this, void 0, void 0, function* () {
         const { client, owner, repo, ref, checkSuiteID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite } = options;
         return new Promise((resolve) => __awaiter(this, void 0, void 0, function* () {
-            const checkSuitesAndMeta = yield getCheckSuites({
+            const checkSuitesAndMeta = yield (0, github_api_interactions_1.getCheckSuites)({
                 client,
                 owner,
                 repo,
@@ -346,12 +460,12 @@ function checkTheCheckSuites(options) {
             if (checkSuitesAndMeta.totalCount === 0 || checkSuitesAndMeta.checkSuites.length === 0) {
                 if (waitForACheckSuite) {
                     core.debug(`No check suites exist for this commit. Waiting for one to show up.`);
-                    resolve(CheckSuiteStatus.queued);
+                    resolve(github_api_interactions_1.CheckSuiteStatus.QUEUED);
                     return;
                 }
                 else {
                     core.info('No check suites exist for this commit.');
-                    resolve(CheckSuiteConclusion.success);
+                    resolve(github_api_interactions_1.CheckSuiteConclusion.SUCCESS);
                     return;
                 }
             }
@@ -380,12 +494,12 @@ function checkTheCheckSuites(options) {
                 }
                 if (waitForACheckSuite) {
                     core.debug(`${message} Waiting for one to show up.`);
-                    resolve(CheckSuiteStatus.queued);
+                    resolve(github_api_interactions_1.CheckSuiteStatus.QUEUED);
                     return;
                 }
                 else {
                     core.info(message);
-                    resolve(CheckSuiteConclusion.success);
+                    resolve(github_api_interactions_1.CheckSuiteConclusion.SUCCESS);
                     return;
                 }
             }
@@ -409,15 +523,15 @@ function checkTheCheckSuites(options) {
                 // Set the array of Check Suites to an array of one containing the first Check Suite created
                 checkSuites = [firstCheckSuite];
             }
-            const highestPriorityCheckSuiteStatus = getHighestPriorityCheckSuiteStatus(checkSuites);
-            if (highestPriorityCheckSuiteStatus === CheckSuiteStatus.completed) {
-                const highestPriorityCheckSuiteConclusion = getHighestPriorityCheckSuiteConclusion(checkSuites);
-                if (highestPriorityCheckSuiteConclusion === CheckSuiteConclusion.success) {
-                    resolve(CheckSuiteConclusion.success);
+            const highestPriorityCheckSuiteStatus = (0, helper_1.getHighestPriorityCheckSuiteStatus)(checkSuites);
+            if (highestPriorityCheckSuiteStatus === github_api_interactions_1.CheckSuiteStatus.COMPLETED) {
+                const highestPriorityCheckSuiteConclusion = (0, helper_1.getHighestPriorityCheckSuiteConclusion)(checkSuites);
+                if (highestPriorityCheckSuiteConclusion === github_api_interactions_1.CheckSuiteConclusion.SUCCESS) {
+                    resolve(github_api_interactions_1.CheckSuiteConclusion.SUCCESS);
                 }
                 else {
                     core.error('One or more check suites were unsuccessful. Below is some metadata on the check suites.');
-                    core.error(JSON.stringify(diagnose(checkSuites)));
+                    core.error(JSON.stringify((0, helper_1.diagnose)(checkSuites)));
                     resolve(highestPriorityCheckSuiteConclusion);
                 }
             }
@@ -426,80 +540,6 @@ function checkTheCheckSuites(options) {
             }
         }));
     });
-}
-function getCheckSuites(options) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const { client, owner, repo, ref } = options;
-        return new Promise((resolve) => __awaiter(this, void 0, void 0, function* () {
-            try {
-                const query = `{
-        repository(owner: "${owner}", name: "${repo}") {
-            name
-            ref(qualifiedName : "${ref}") {
-                target {
-                    ... on Commit {
-                        checkSuites(first: 100) {
-                            nodes {
-                                id,
-                                app {
-                                    slug,
-                                    name
-                                },
-                                createdAt,
-                                conclusion,
-                                status   
-                            }
-                        }
-                    }
-                }
-            }
-        }
-      }`;
-                const response = yield client.graphql(query);
-                resolve({
-                    totalCount: response.repository.ref.target.checkSuites.nodes.length,
-                    checkSuites: response.repository.ref.target.checkSuites.nodes
-                });
-            }
-            catch (e) {
-                throw new Error(`Failed to list check suites for ${owner}/${repo}@${ref}. Error: ${e}`);
-            }
-        }));
-    });
-}
-function diagnose(checkSuites) {
-    return checkSuites;
-}
-function getHighestPriorityCheckSuiteStatus(checkSuites) {
-    return checkSuites
-        .map(checkSuite => checkSuite.status)
-        .reduce((previous, current) => {
-        for (const status of Object.keys(CheckSuiteStatus)) {
-            if (previous === status) {
-                return previous;
-            }
-            else if (current === status) {
-                return current;
-            }
-        }
-        return current;
-    }, CheckSuiteStatus.completed);
-}
-function getHighestPriorityCheckSuiteConclusion(checkSuites) {
-    var _a;
-    return ((_a = checkSuites
-        .map(checkSuite => checkSuite.conclusion)
-        .reduce((previous, current) => {
-        for (const conclusion of Object.keys(CheckSuiteConclusion)) {
-            if (previous === conclusion) {
-                return previous;
-            }
-            else if (current === conclusion) {
-                return current;
-            }
-        }
-        return current;
-    }, CheckSuiteConclusion.success)) !== null && _a !== void 0 ? _a : CheckSuiteConclusion.success);
 }
 
 

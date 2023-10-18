@@ -91,6 +91,7 @@ describe('main', () => {
       })
     })
 
+    const startTime = new Date(Date.now())
     try {
       await WaitForCheckSuites.waitForCheckSuites({
         client: octokit,
@@ -108,12 +109,14 @@ describe('main', () => {
       expect(e).toEqual(new Error(`Timeout of 1 seconds reached.`))
     }
 
-    expect.assertions(1)
+    const endTime = new Date(Date.now())
+    expect(endTime.valueOf() - startTime.valueOf()).toBeLessThan(2000)
+
+    expect.assertions(2)
   })
 })
 
 describe('get highest priority', () => {
-
   it('should detect highest priority status pending', async () => {
     const highestPriority = Helper.getHighestPriorityCheckSuiteStatus([
       {
@@ -134,8 +137,32 @@ describe('get highest priority', () => {
         conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
         status: GitHubInteractions.CheckSuiteStatus.COMPLETED
       }
-    ]);
-    expect(highestPriority).toBe(GitHubInteractions.CheckSuiteStatus.PENDING);
+    ])
+    expect(highestPriority).toBe(GitHubInteractions.CheckSuiteStatus.PENDING)
+  })
+
+  it('should detect highest priority status completed', async () => {
+    const highestPriority = Helper.getHighestPriorityCheckSuiteStatus([
+      {
+        id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NA==',
+        app: {
+          slug: 'github-actions'
+        },
+        createdAt: '2023-10-12T13:47:50Z',
+        conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
+        status: GitHubInteractions.CheckSuiteStatus.COMPLETED
+      },
+      {
+        id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NQ==',
+        app: {
+          slug: 'github-actions'
+        },
+        createdAt: '2023-10-12T13:37:50Z',
+        conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
+        status: GitHubInteractions.CheckSuiteStatus.COMPLETED
+      }
+    ])
+    expect(highestPriority).toBe(GitHubInteractions.CheckSuiteStatus.COMPLETED)
   })
 
   it('should detect highest priority conclusion failure', async () => {
@@ -158,8 +185,32 @@ describe('get highest priority', () => {
         conclusion: GitHubInteractions.CheckSuiteConclusion.FAILURE,
         status: GitHubInteractions.CheckSuiteStatus.COMPLETED
       }
-    ]);
-    expect(highestPriority).toBe(GitHubInteractions.CheckSuiteConclusion.FAILURE);
+    ])
+    expect(highestPriority).toBe(GitHubInteractions.CheckSuiteConclusion.FAILURE)
+  })
+
+  it('should detect highest priority conclusion success', async () => {
+    const highestPriority = Helper.getHighestPriorityCheckSuiteConclusion([
+      {
+        id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NA==',
+        app: {
+          slug: 'github-actions'
+        },
+        createdAt: '2023-10-12T13:47:50Z',
+        conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
+        status: GitHubInteractions.CheckSuiteStatus.COMPLETED
+      },
+      {
+        id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NQ==',
+        app: {
+          slug: 'github-actions'
+        },
+        createdAt: '2023-10-12T13:37:50Z',
+        conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
+        status: GitHubInteractions.CheckSuiteStatus.COMPLETED
+      }
+    ])
+    expect(highestPriority).toBe(GitHubInteractions.CheckSuiteConclusion.SUCCESS)
   })
 
   it('should not call getting highest conclusion if checksuite status is not completed.', async () => {
@@ -173,10 +224,10 @@ describe('get highest priority', () => {
         conclusion: undefined,
         status: GitHubInteractions.CheckSuiteStatus.IN_PROGRESS
       }
-    ];
+    ]
 
-    const getHighestPriorityCheckSuiteStatusSpy = jest.spyOn(Helper, 'getHighestPriorityCheckSuiteStatus');
-    const getHighestPriorityCheckSuiteConclusionSpy = jest.spyOn(Helper, 'getHighestPriorityCheckSuiteConclusion');
+    const getHighestPriorityCheckSuiteStatusSpy = jest.spyOn(Helper, 'getHighestPriorityCheckSuiteStatus')
+    const getHighestPriorityCheckSuiteConclusionSpy = jest.spyOn(Helper, 'getHighestPriorityCheckSuiteConclusion')
 
     const octokit = getOctokit('123')
     jest.spyOn(octokit, 'graphql').mockImplementation(async () => {
@@ -184,7 +235,7 @@ describe('get highest priority', () => {
         resolve({
           repository: {
             ref: {
-              target: { 
+              target: {
                 checkSuites: {
                   nodes: checkSuites
                 }
@@ -212,12 +263,11 @@ describe('get highest priority', () => {
       expect(e).toEqual(new Error(`Timeout of 1 seconds reached.`))
     }
 
-    expect(getHighestPriorityCheckSuiteConclusionSpy).toHaveBeenCalledTimes(0);
+    expect(getHighestPriorityCheckSuiteConclusionSpy).toHaveBeenCalledTimes(0)
 
     // should be called twice, once for the first check and second check during interval.
-    expect(getHighestPriorityCheckSuiteStatusSpy).toHaveBeenCalledTimes(2);
+    expect(getHighestPriorityCheckSuiteStatusSpy).toHaveBeenCalledTimes(2)
 
     expect.assertions(3)
   })
-
 })
