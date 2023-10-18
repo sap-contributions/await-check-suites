@@ -16,21 +16,19 @@ describe('main', () => {
       return new Promise<GitHubInteractions.RepositoryResult>(resolve => {
         resolve({
           repository: {
-            ref: {
-              target: {
-                checkSuites: {
-                  nodes: [
-                    {
-                      id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NA==',
-                      app: {
-                        slug: 'github-actions'
-                      },
-                      createdAt: '2023-10-12T13:47:50Z',
-                      conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
-                      status: GitHubInteractions.CheckSuiteStatus.COMPLETED
-                    }
-                  ]
-                }
+            object: {
+              checkSuites: {
+                nodes: [
+                  {
+                    id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NA==',
+                    app: {
+                      slug: 'github-actions'
+                    },
+                    createdAt: '2023-10-12T13:47:50Z',
+                    conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
+                    status: GitHubInteractions.CheckSuiteStatus.COMPLETED
+                  }
+                ]
               }
             }
           }
@@ -60,30 +58,28 @@ describe('main', () => {
       return new Promise<GitHubInteractions.RepositoryResult>(resolve => {
         resolve({
           repository: {
-            ref: {
-              target: {
-                checkSuites: {
-                  nodes: [
-                    {
-                      id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NQ==',
-                      app: {
-                        slug: 'github-actions'
-                      },
-                      createdAt: '2023-10-12T13:37:50Z',
-                      conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
-                      status: GitHubInteractions.CheckSuiteStatus.COMPLETED
+            object: {
+              checkSuites: {
+                nodes: [
+                  {
+                    id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NQ==',
+                    app: {
+                      slug: 'github-actions'
                     },
-                    {
-                      id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NA==',
-                      app: {
-                        slug: 'github-actions'
-                      },
-                      createdAt: '2023-10-12T13:47:50Z',
-                      conclusion: GitHubInteractions.CheckSuiteConclusion.NEUTRAL,
-                      status: GitHubInteractions.CheckSuiteStatus.PENDING
-                    }
-                  ]
-                }
+                    createdAt: '2023-10-12T13:37:50Z',
+                    conclusion: GitHubInteractions.CheckSuiteConclusion.SUCCESS,
+                    status: GitHubInteractions.CheckSuiteStatus.COMPLETED
+                  },
+                  {
+                    id: 'MDEwOkNoZWNrU3VpdGUxODQ0OTc5NA==',
+                    app: {
+                      slug: 'github-actions'
+                    },
+                    createdAt: '2023-10-12T13:47:50Z',
+                    conclusion: GitHubInteractions.CheckSuiteConclusion.NEUTRAL,
+                    status: GitHubInteractions.CheckSuiteStatus.PENDING
+                  }
+                ]
               }
             }
           }
@@ -234,11 +230,9 @@ describe('get highest priority', () => {
       return new Promise<GitHubInteractions.RepositoryResult>(resolve => {
         resolve({
           repository: {
-            ref: {
-              target: {
-                checkSuites: {
-                  nodes: checkSuites
-                }
+            object: {
+              checkSuites: {
+                nodes: checkSuites
               }
             }
           }

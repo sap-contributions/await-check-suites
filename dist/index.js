@@ -156,32 +156,30 @@ function getCheckSuites(options) {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             try {
                 const query = `{
-          repository(owner: "${owner}", name: "${repo}") {
-              name
-              ref(qualifiedName : "${ref}") {
-                  target {
-                      ... on Commit {
-                          checkSuites(first: 100) {
-                              nodes {
-                                  id,
-                                  app {
-                                      slug,
-                                      name
-                                  },
-                                  createdAt,
-                                  conclusion,
-                                  status   
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-        }`;
+        repository(owner: "${owner}", name: "${repo}") {
+            name
+            object(oid: "${ref}") {
+                ... on Commit {
+                    checkSuites(first: 100) {
+                        nodes {
+                            id,
+                            app {
+                                slug,
+                                name
+                            },
+                            createdAt,
+                            conclusion,
+                            status   
+                        }
+                    }
+                }
+            }
+        }
+      }`;
                 const response = yield client.graphql(query);
                 resolve({
-                    totalCount: response.repository.ref.target.checkSuites.nodes.length,
-                    checkSuites: response.repository.ref.target.checkSuites.nodes
+                    totalCount: response.repository.object.checkSuites.nodes.length,
+                    checkSuites: response.repository.object.checkSuites.nodes
                 });
             }
             catch (e) {

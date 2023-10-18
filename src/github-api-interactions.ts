@@ -12,14 +12,10 @@ export interface RepositoryResult {
 }
 
 interface Repository {
-  ref: Ref
+  object: Commit
 }
 
-interface Ref {
-  target: Target
-}
-
-interface Target {
+interface Commit {
   checkSuites: CheckSuiteEdges
 }
 
@@ -70,34 +66,32 @@ export async function getCheckSuites(options: GetCheckSuitesOptions): Promise<Ch
   return new Promise(async (resolve, reject) => {
     try {
       const query = `{
-          repository(owner: "${owner}", name: "${repo}") {
-              name
-              ref(qualifiedName : "${ref}") {
-                  target {
-                      ... on Commit {
-                          checkSuites(first: 100) {
-                              nodes {
-                                  id,
-                                  app {
-                                      slug,
-                                      name
-                                  },
-                                  createdAt,
-                                  conclusion,
-                                  status   
-                              }
-                          }
-                      }
-                  }
-              }
-          }
-        }`
+        repository(owner: "${owner}", name: "${repo}") {
+            name
+            object(oid: "${ref}") {
+                ... on Commit {
+                    checkSuites(first: 100) {
+                        nodes {
+                            id,
+                            app {
+                                slug,
+                                name
+                            },
+                            createdAt,
+                            conclusion,
+                            status   
+                        }
+                    }
+                }
+            }
+        }
+      }`
 
       const response = await client.graphql<RepositoryResult>(query)
 
       resolve({
-        totalCount: response.repository.ref.target.checkSuites.nodes.length,
-        checkSuites: response.repository.ref.target.checkSuites.nodes
+        totalCount: response.repository.object.checkSuites.nodes.length,
+        checkSuites: response.repository.object.checkSuites.nodes
       })
     } catch (e) {
       reject(e)
