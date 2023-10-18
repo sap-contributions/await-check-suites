@@ -42,6 +42,7 @@ describe('main', () => {
       repo: 'await-check-suite-test',
       ref: '376e38096d7f7ef69af8f4ce7128de82c12269c1',
       checkSuiteID: null,
+      checkSuiteNodeID: null,
       waitForACheckSuite: true,
       intervalSeconds: 2,
       timeoutSeconds: 4,
@@ -95,6 +96,7 @@ describe('main', () => {
         repo: 'await-check-suite-test',
         ref: '376e38096d7f7ef69af8f4ce7128de82c12269c1',
         checkSuiteID: null,
+        checkSuiteNodeID: null,
         waitForACheckSuite: true,
         intervalSeconds: 1,
         timeoutSeconds: 1,
@@ -110,6 +112,8 @@ describe('main', () => {
 
     expect.assertions(2)
   })
+
+  // TODO: Write tests for checking if CheckSuiteNodeID works as intended to filter out own CheckRun.
 })
 
 describe('get highest priority', () => {
@@ -247,6 +251,7 @@ describe('get highest priority', () => {
         repo: 'await-check-suite-test',
         ref: '376e38096d7f7ef69af8f4ce7128de82c12269c1',
         checkSuiteID: null,
+        checkSuiteNodeID: null,
         waitForACheckSuite: true,
         intervalSeconds: 1,
         timeoutSeconds: 1,

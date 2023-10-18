@@ -9,6 +9,7 @@ interface WaitForCheckSuitesOptions {
   repo: string
   ref: string
   checkSuiteID: number | null
+  checkSuiteNodeID: string | null
   waitForACheckSuite: boolean
   intervalSeconds: number
   timeoutSeconds: number | null
@@ -21,6 +22,7 @@ interface CheckTheCheckSuitesOptions {
   repo: string
   ref: string
   checkSuiteID: number | null
+  checkSuiteNodeID: string | null
   waitForACheckSuite: boolean
   appSlugFilter: string | null
   onlyFirstCheckSuite: boolean
@@ -33,6 +35,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
     repo,
     ref,
     checkSuiteID,
+    checkSuiteNodeID,
     waitForACheckSuite,
     intervalSeconds,
     timeoutSeconds,
@@ -49,6 +52,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
       repo,
       ref,
       checkSuiteID,
+      checkSuiteNodeID,
       waitForACheckSuite,
       appSlugFilter,
       onlyFirstCheckSuite
@@ -77,6 +81,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
         repo,
         ref,
         checkSuiteID,
+        checkSuiteNodeID,
         waitForACheckSuite,
         appSlugFilter,
         onlyFirstCheckSuite
@@ -115,7 +120,7 @@ export async function waitForCheckSuites(options: WaitForCheckSuitesOptions): Pr
 async function checkTheCheckSuites(
   options: CheckTheCheckSuitesOptions
 ): Promise<Exclude<CheckSuiteStatus, CheckSuiteStatus.COMPLETED> | CheckSuiteConclusion> {
-  const {client, owner, repo, ref, checkSuiteID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite} = options
+  const {client, owner, repo, ref, checkSuiteNodeID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite} = options
 
   return new Promise(async resolve => {
     const checkSuitesAndMeta = await getCheckSuites({
@@ -142,17 +147,15 @@ async function checkTheCheckSuites(
       ? checkSuitesAndMeta.checkSuites.filter(checkSuite => checkSuite.app?.slug === appSlugFilter)
       : checkSuitesAndMeta.checkSuites
 
-    // Ignore this Check Run's Check Suite
-    // TODO: Check if encoded checkSuiteID (which is a number) matches the format of the id of the graphql response
-    const encodedChekSuiteID = Buffer.from(`010:CheckSuite${checkSuiteID}`, 'binary').toString('base64')
-    checkSuites = checkSuites.filter(checkSuite => encodedChekSuiteID !== checkSuite.id)
+    // Ignore this Check Run's Check Suite, using the checkSuiteNodeID as GraphQL returns the NodeID
+    checkSuites = checkSuites.filter(checkSuite => checkSuiteNodeID !== checkSuite.id)
 
     // Check if there are no more Check Suites after the app slug and Check Suite ID filters
     if (checkSuites.length === 0) {
       let message = ''
-      if (appSlugFilter && checkSuiteID !== null) {
+      if (appSlugFilter && checkSuiteNodeID !== null) {
         message = `No check suites (excluding this one) with the app slug '${appSlugFilter}' exist for this commit.`
-      } else if (checkSuiteID !== null) {
+      } else if (checkSuiteNodeID !== null) {
         message = `No check suites (excluding this one) exist for this commit.`
       } else if (appSlugFilter) {
         message = `No check suites with the app slug '${appSlugFilter}' exist for this commit.`

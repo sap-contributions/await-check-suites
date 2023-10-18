@@ -9,6 +9,7 @@ interface Inputs {
   repo: string
   ref: string
   checkSuiteID: number | null
+  checkSuiteNodeID: string | null
   waitForACheckSuite: boolean
   intervalSeconds: number
   timeoutSeconds: number | null
@@ -47,6 +48,7 @@ export async function getInput(): Promise<Inputs> {
     )
   }
   let checkSuiteID: number | null = null
+  let checkSuiteNodeID: string | null = null
   if (owner === context.repo.owner && repo === context.repo.repo) {
     const workflowRunID = parseInt(process.env.GITHUB_RUN_ID)
     const response = await client.rest.actions.getWorkflowRun({owner, repo, run_id: workflowRunID})
@@ -69,11 +71,20 @@ export async function getInput(): Promise<Inputs> {
     }
     /* eslint-enable @typescript-eslint/no-explicit-any */
     checkSuiteID = parseInt(checkSuiteIDString)
+
+    checkSuiteNodeID = response.data.check_suite_node_id ?? null
   }
 
   if (checkSuiteID !== null && isNaN(checkSuiteID)) {
     throw new Error(
-      `Expected the environment variable $GITHUB_RUN_ID to be a number but it isn't (${checkSuiteID} as ${typeof checkSuiteID}). ` +
+      `Expected checkSuiteID to be a number but it isn't (${checkSuiteID} as ${typeof checkSuiteID}). ` +
+        "Please submit an issue on this action's GitHub repo."
+    )
+  }
+
+  if (!checkSuiteNodeID) {
+    throw new Error(
+      `Expected a CheckSuiteNodeId for GitHubRunID: ${process.env.GITHUB_RUN_ID}. ` +
         "Please submit an issue on this action's GitHub repo."
     )
   }
@@ -97,6 +108,7 @@ export async function getInput(): Promise<Inputs> {
     ref,
     waitForACheckSuite: parseBoolean(core.getInput('waitForACheckSuite', {required: true})),
     checkSuiteID,
+    checkSuiteNodeID,
     intervalSeconds: parseInt(core.getInput('intervalSeconds', {required: true})),
     timeoutSeconds,
     failStepIfUnsuccessful: parseBoolean(core.getInput('failStepIfUnsuccessful', {required: true})),

@@ -44,6 +44,7 @@ const core = __importStar(__nccwpck_require__(2186));
 const github_1 = __nccwpck_require__(5438);
 const parse_boolean_1 = __nccwpck_require__(4783);
 function getInput() {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         core.debug(JSON.stringify({ repository: `${github_1.context.repo.owner}/${github_1.context.repo.repo}`, ref: github_1.context.ref, sha: github_1.context.sha }));
         // Create GitHub client
@@ -64,6 +65,7 @@ function getInput() {
             throw new Error(`Expected the environment variable $GITHUB_RUN_ID to be set to a truthy value, but it isn't (${process.env.GITHUB_RUN_ID} as ${typeof process.env.GITHUB_RUN_ID}). Please submit an issue on this action's GitHub repo.`);
         }
         let checkSuiteID = null;
+        let checkSuiteNodeID = null;
         if (owner === github_1.context.repo.owner && repo === github_1.context.repo.repo) {
             const workflowRunID = parseInt(process.env.GITHUB_RUN_ID);
             const response = yield client.rest.actions.getWorkflowRun({ owner, repo, run_id: workflowRunID });
@@ -80,9 +82,14 @@ function getInput() {
             }
             /* eslint-enable @typescript-eslint/no-explicit-any */
             checkSuiteID = parseInt(checkSuiteIDString);
+            checkSuiteNodeID = (_a = response.data.check_suite_node_id) !== null && _a !== void 0 ? _a : null;
         }
         if (checkSuiteID !== null && isNaN(checkSuiteID)) {
-            throw new Error(`Expected the environment variable $GITHUB_RUN_ID to be a number but it isn't (${checkSuiteID} as ${typeof checkSuiteID}). ` +
+            throw new Error(`Expected checkSuiteID to be a number but it isn't (${checkSuiteID} as ${typeof checkSuiteID}). ` +
+                "Please submit an issue on this action's GitHub repo.");
+        }
+        if (!checkSuiteNodeID) {
+            throw new Error(`Expected a CheckSuiteNodeId for GitHubRunID: ${process.env.GITHUB_RUN_ID}. ` +
                 "Please submit an issue on this action's GitHub repo.");
         }
         // Default the timeout to null
@@ -101,6 +108,7 @@ function getInput() {
             ref,
             waitForACheckSuite: (0, parse_boolean_1.parseBoolean)(core.getInput('waitForACheckSuite', { required: true })),
             checkSuiteID,
+            checkSuiteNodeID,
             intervalSeconds: parseInt(core.getInput('intervalSeconds', { required: true })),
             timeoutSeconds,
             failStepIfUnsuccessful: (0, parse_boolean_1.parseBoolean)(core.getInput('failStepIfUnsuccessful', { required: true })),
@@ -313,7 +321,7 @@ const github_api_interactions_1 = __nccwpck_require__(2642);
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const { client, owner, repo, ref, checkSuiteID, waitForACheckSuite, intervalSeconds, timeoutSeconds, failStepIfUnsuccessful, appSlugFilter, onlyFirstCheckSuite } = yield (0, get_input_1.getInput)();
+            const { client, owner, repo, ref, checkSuiteID, checkSuiteNodeID, waitForACheckSuite, intervalSeconds, timeoutSeconds, failStepIfUnsuccessful, appSlugFilter, onlyFirstCheckSuite } = yield (0, get_input_1.getInput)();
             core.info(`Id of CheckSuiteID: ${checkSuiteID}`);
             const conclusion = yield (0, wait_for_check_suites_1.waitForCheckSuites)({
                 client,
@@ -321,6 +329,7 @@ function run() {
                 repo,
                 ref,
                 checkSuiteID,
+                checkSuiteNodeID,
                 waitForACheckSuite,
                 intervalSeconds,
                 timeoutSeconds,
@@ -403,7 +412,7 @@ const github_api_interactions_1 = __nccwpck_require__(2642);
 const helper_1 = __nccwpck_require__(3947);
 function waitForCheckSuites(options) {
     return __awaiter(this, void 0, void 0, function* () {
-        const { client, owner, repo, ref, checkSuiteID, waitForACheckSuite, intervalSeconds, timeoutSeconds, appSlugFilter, onlyFirstCheckSuite } = options;
+        const { client, owner, repo, ref, checkSuiteID, checkSuiteNodeID, waitForACheckSuite, intervalSeconds, timeoutSeconds, appSlugFilter, onlyFirstCheckSuite } = options;
         /* eslint-disable no-async-promise-executor */
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             // Check to see if all of the check suites have already completed
@@ -413,6 +422,7 @@ function waitForCheckSuites(options) {
                 repo,
                 ref,
                 checkSuiteID,
+                checkSuiteNodeID,
                 waitForACheckSuite,
                 appSlugFilter,
                 onlyFirstCheckSuite
@@ -438,6 +448,7 @@ function waitForCheckSuites(options) {
                     repo,
                     ref,
                     checkSuiteID,
+                    checkSuiteNodeID,
                     waitForACheckSuite,
                     appSlugFilter,
                     onlyFirstCheckSuite
@@ -474,7 +485,7 @@ function waitForCheckSuites(options) {
 exports.waitForCheckSuites = waitForCheckSuites;
 function checkTheCheckSuites(options) {
     return __awaiter(this, void 0, void 0, function* () {
-        const { client, owner, repo, ref, checkSuiteID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite } = options;
+        const { client, owner, repo, ref, checkSuiteNodeID, waitForACheckSuite, appSlugFilter, onlyFirstCheckSuite } = options;
         return new Promise((resolve) => __awaiter(this, void 0, void 0, function* () {
             const checkSuitesAndMeta = yield (0, github_api_interactions_1.getCheckSuites)({
                 client,
@@ -498,17 +509,15 @@ function checkTheCheckSuites(options) {
             let checkSuites = appSlugFilter
                 ? checkSuitesAndMeta.checkSuites.filter(checkSuite => { var _a; return ((_a = checkSuite.app) === null || _a === void 0 ? void 0 : _a.slug) === appSlugFilter; })
                 : checkSuitesAndMeta.checkSuites;
-            // Ignore this Check Run's Check Suite
-            // TODO: Check if encoded checkSuiteID (which is a number) matches the format of the id of the graphql response
-            const encodedChekSuiteID = Buffer.from(`010:CheckSuite${checkSuiteID}`, 'binary').toString('base64');
-            checkSuites = checkSuites.filter(checkSuite => encodedChekSuiteID !== checkSuite.id);
+            // Ignore this Check Run's Check Suite, using the checkSuiteNodeID as GraphQL returns the NodeID
+            checkSuites = checkSuites.filter(checkSuite => checkSuiteNodeID !== checkSuite.id);
             // Check if there are no more Check Suites after the app slug and Check Suite ID filters
             if (checkSuites.length === 0) {
                 let message = '';
-                if (appSlugFilter && checkSuiteID !== null) {
+                if (appSlugFilter && checkSuiteNodeID !== null) {
                     message = `No check suites (excluding this one) with the app slug '${appSlugFilter}' exist for this commit.`;
                 }
-                else if (checkSuiteID !== null) {
+                else if (checkSuiteNodeID !== null) {
                     message = `No check suites (excluding this one) exist for this commit.`;
                 }
                 else if (appSlugFilter) {
